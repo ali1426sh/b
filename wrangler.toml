@@ -1,4 +1,3 @@
 name = "my-worker"
-type = "javascript"
 compatibility_date = "2025-04-02"
 main = "bot.js"  # Update to your JavaScript file name

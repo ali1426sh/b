@@ -1,4 +1,4 @@
 name = "my-worker"
 type = "python"
 compatibility_date = "2025-04-02"
-main = "src/index.ts"
+main = "bot.py"  # Update this to point to your Python script

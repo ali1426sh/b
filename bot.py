@@ -1,66 +1,94 @@
+export default {
+    async fetch(request, env) {
+        const db = env.DB;
+        const url = new URL(request.url);
+        const path = url.pathname.slice(1);
+        const base_url = url.origin;
+        
+        if (path === "init") {
+            const body = await postReq("setWebhook", {
+                "url": `${base_url}/${HOOK}`
+            });
+            return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+        }
 
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+        if (path === HOOK) {
+            try {
+                const tgResponse = await request.json();
+                
+                if (tgResponse.callback_query) {
+                    const callbackQuery = tgResponse.callback_query;
+                    const chatId = callbackQuery.from.id;
+                    const replytoID = decrypt(callbackQuery.message.reply_markup.inline_keyboard[0][0].callback_data);
+                    const targetReply = await db.prepare("SELECT * FROM users WHERE id = ?").bind(replytoID).first();
+                    await db.prepare("UPDATE users SET target_user = ? WHERE telegram_user_id = ?").bind(targetReply.telegram_user_id, chatId).run();
 
+                    await postReq("sendMessage", {
+                        chat_id: chatId,
+                        text: "این پایین بنویس و ارسال کن 👇",
+                        reply_parameters: {
+                            message_id: callbackQuery.message.message_id,
+                            chat_id: chatId
+                        }
+                    });
+                    
+                    await postReq("answerCallbackQuery", { callback_query_id: callbackQuery.id });
+                }
 
-TOKEN = '7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus'
+                if (tgResponse.message) {
+                    const message = tgResponse.message;
+                    const chatId = message.from.id;
+                    
+                    if (message.text?.startsWith("/start")) {
+                        const startedUser = await db.prepare("SELECT * FROM users WHERE telegram_user_id = ?").bind(chatId).first();
+                        let startedUserId = startedUser ? startedUser.id : (await db.prepare("INSERT INTO users (telegram_user_id, rkey, target_user) VALUES (?, ?, ?)").bind(chatId, rndKey(), "").run()).meta.last_row_id;
+                        
+                        const match = message.text.match(/\/start (\w+)_(\w+)/);
+                        if (match) {
+                            const [_, param_rkey, param_id] = match;
+                            const targetUser = await db.prepare("SELECT * FROM users WHERE id = ? AND rkey = ?").bind(revHxId(param_id), param_rkey).first();
+                            if (targetUser) {
+                                await db.prepare("UPDATE users SET target_user = ? WHERE id = ?").bind(targetUser.telegram_user_id, startedUserId).run();
+                                await postReq("sendMessage", {
+                                    chat_id: chatId,
+                                    text: `در حال ارسال پیام ناشناس به ${targetUser.telegram_user_id} هستی` 
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error handling webhook:", e);
+            }
+            return new Response("idle");
+        }
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Hello, World")
+        return new Response("ok");
+    }
+};
 
-def main():
-    app = Application.builder().token(TOKEN).build()
-    start_handler = CommandHandler('start', start)
-    app.add_handler(start_handler)
-    app.run_polling()
+const BOT_TOKEN = "7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus";
+const HOOK = crypto.createHash("md5").update(BOT_TOKEN).digest("hex");
 
-if __name__ == "__main__":
-    main()
+async function postReq(method, payload) {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    return response.json();
+}
 
+function rndKey() {
+    return Math.random().toString(36).substr(2, 8);
+}
 
+function revHxId(hxid) {
+    return parseInt(hxid.split("").reverse().join(""), 16);
+}
 
-# import requests
-# import telebot
-
-
-# TOKEN = '7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus'
-
-# # Proxy settings
-# proxy = {
-#     'http':  'http://DDBighLLvXrFGRMCBVJdFQRueWVrdGFuZXQuY29tZmFyYTrhdi5jb212YZ6ubmFqXeEuY29tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA@192.168.1.1.apt-kernel.org.copan-moban.info.:2040',
-#     'https': 'http://DDBighLLvXrFGRMCBVJdFQRueWVrdGFuZXQuY29tZmFyYTrhdi5jb212YZ6ubmFqXeEuY29tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA@192.168.1.1.apt-kernel.org.copan-moban.info.:2040'
-# }
-
-# # URL you want to access
-# url = 'https://api.telegram.org/bot<Your_Token>/getMe'
-
-# # bot = telebot.TeleBot(TOKEN, proxy=proxy)
-
-
-
-# print(dir(telebot.TeleBot))
-
-
-# import telebot
-# import requests
-
-# # Your Telegram Bot Token
-# TOKEN = '7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus'
-
-# # Proxy details
-# proxy = "http://cloudflare.com.nokia.com.co.uk.do_yo.want_to.clash_with.this.www.microsoft.com.there_is_no.place_like.localhost.www.bing.com.count_with_me.cyou.net.digikala.com.www.enamad.ir.www.google.com.again_to_fight.everyone.i_am.the_internet.bolombergon-88.info:4550"
-
-# # Set up the requests session with the proxy
-# session = requests.Session()
-# session.proxies = {
-#     'http': proxy,
-#     'https': proxy
-# }
-
-# # Create the bot using the requests session
-# bot = telebot.TeleBot(TOKEN, request_session=session)
-
-# @bot.message_handler(['start'])
-# def welcome(message):
-#     bot.send(message.chat.id, 'hello')
-# bot.polling()
+function decrypt(encrypted_data) {
+    const key = HOOK;
+    const decoded = Buffer.from(encrypted_data, "base64").toString("binary");
+    return decoded.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join("");
+}

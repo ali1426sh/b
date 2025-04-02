@@ -76,7 +76,12 @@ async function generateHook(token) {
     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-const HOOK = await generateHook(BOT_TOKEN);
+let HOOK;
+
+(async () => {
+    HOOK = await generateHook(BOT_TOKEN);
+})();
+
 
 
 async function postReq(method, payload) {

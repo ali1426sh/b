@@ -68,7 +68,16 @@ export default {
 };
 
 const BOT_TOKEN = "7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus";
-const HOOK = crypto.createHash("md5").update(BOT_TOKEN).digest("hex");
+async function generateHook(token) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(token);
+    const hashBuffer = await crypto.subtle.digest("MD5", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+const HOOK = await generateHook(BOT_TOKEN);
+
 
 async function postReq(method, payload) {
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {

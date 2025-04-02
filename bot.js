@@ -4,6 +4,7 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname.slice(1);
         const base_url = url.origin;
+        const HOOK = await generateHook(BOT_TOKEN); 
         
         if (path === "init") {
             const body = await postReq("setWebhook", {
@@ -19,7 +20,7 @@ export default {
                 if (tgResponse.callback_query) {
                     const callbackQuery = tgResponse.callback_query;
                     const chatId = callbackQuery.from.id;
-                    const replytoID = decrypt(callbackQuery.message.reply_markup.inline_keyboard[0][0].callback_data);
+                    const replytoID = decrypt(callbackQuery.message.reply_markup.inline_keyboard[0][0].callback_data, HOOK);
                     const targetReply = await db.prepare("SELECT * FROM users WHERE id = ?").bind(replytoID).first();
                     await db.prepare("UPDATE users SET target_user = ? WHERE telegram_user_id = ?").bind(targetReply.telegram_user_id, chatId).run();
 
@@ -67,22 +68,15 @@ export default {
     }
 };
 
-const BOT_TOKEN = "7974221862:AAFpcASl_TItAg2GyhEfQvWXfw1XoZSqEus";
+const BOT_TOKEN = "456889453156:AAFSOIJDFIDLKCVLKXISFNZFrFSODIFX";
+
 async function generateHook(token) {
     const encoder = new TextEncoder();
     const data = encoder.encode(token);
-    const hashBuffer = await crypto.subtle.digest("MD5", data);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
-
-let HOOK;
-
-(async () => {
-    HOOK = await generateHook(BOT_TOKEN);
-})();
-
-
 
 async function postReq(method, payload) {
     const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
@@ -101,8 +95,7 @@ function revHxId(hxid) {
     return parseInt(hxid.split("").reverse().join(""), 16);
 }
 
-function decrypt(encrypted_data) {
-    const key = HOOK;
+function decrypt(encrypted_data, key) {
     const decoded = Buffer.from(encrypted_data, "base64").toString("binary");
     return decoded.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join("");
 }

@@ -1,3 +1,4 @@
 name = "my-worker"
-type = "javascript"
-account_id = "your-cloudflare-account-id"
+type = "python"
+compatibility_date = "2025-04-02"
+main = "src/index.ts"

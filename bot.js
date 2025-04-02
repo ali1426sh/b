@@ -4,8 +4,10 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname.slice(1);
         const base_url = url.origin;
-        const HOOK = await generateHook(BOT_TOKEN); 
-        
+
+        // Generate HOOK inside fetch() since top-level await is not allowed
+        const HOOK = await generateHook(BOT_TOKEN);
+
         if (path === "init") {
             const body = await postReq("setWebhook", {
                 "url": `${base_url}/${HOOK}`
@@ -16,7 +18,7 @@ export default {
         if (path === HOOK) {
             try {
                 const tgResponse = await request.json();
-                
+
                 if (tgResponse.callback_query) {
                     const callbackQuery = tgResponse.callback_query;
                     const chatId = callbackQuery.from.id;
@@ -32,18 +34,18 @@ export default {
                             chat_id: chatId
                         }
                     });
-                    
+
                     await postReq("answerCallbackQuery", { callback_query_id: callbackQuery.id });
                 }
 
                 if (tgResponse.message) {
                     const message = tgResponse.message;
                     const chatId = message.from.id;
-                    
+
                     if (message.text?.startsWith("/start")) {
                         const startedUser = await db.prepare("SELECT * FROM users WHERE telegram_user_id = ?").bind(chatId).first();
                         let startedUserId = startedUser ? startedUser.id : (await db.prepare("INSERT INTO users (telegram_user_id, rkey, target_user) VALUES (?, ?, ?)").bind(chatId, rndKey(), "").run()).meta.last_row_id;
-                        
+
                         const match = message.text.match(/\/start (\w+)_(\w+)/);
                         if (match) {
                             const [_, param_rkey, param_id] = match;
@@ -52,7 +54,7 @@ export default {
                                 await db.prepare("UPDATE users SET target_user = ? WHERE id = ?").bind(targetUser.telegram_user_id, startedUserId).run();
                                 await postReq("sendMessage", {
                                     chat_id: chatId,
-                                    text: `در حال ارسال پیام ناشناس به ${targetUser.telegram_user_id} هستی` 
+                                    text: `در حال ارسال پیام ناشناس به ${targetUser.telegram_user_id} هستی`
                                 });
                             }
                         }
@@ -70,6 +72,7 @@ export default {
 
 const BOT_TOKEN = "456889453156:AAFSOIJDFIDLKCVLKXISFNZFrFSODIFX";
 
+// ✅ Fix: Use Web Crypto API (SHA-256 instead of MD5)
 async function generateHook(token) {
     const encoder = new TextEncoder();
     const data = encoder.encode(token);
@@ -95,6 +98,7 @@ function revHxId(hxid) {
     return parseInt(hxid.split("").reverse().join(""), 16);
 }
 
+// ✅ Fix: Pass `HOOK` explicitly to `decrypt()`
 function decrypt(encrypted_data, key) {
     const decoded = Buffer.from(encrypted_data, "base64").toString("binary");
     return decoded.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key.charCodeAt(i % key.length))).join("");

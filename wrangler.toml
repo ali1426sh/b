@@ -1,4 +1,7 @@
 name = "my-worker"
 type = "python"
 compatibility_date = "2025-04-02"
-main = "bot.py"  # Update this to point to your Python script
+main = "bot.py"  # Make sure this points to your main Python script
+
+# Add this compatibility flag for Python Workers
+compatibility_flags = ["python_workers"]
